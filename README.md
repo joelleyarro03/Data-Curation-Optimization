@@ -2,7 +2,7 @@
 PortFolio/Data-Curation-Optimization
 # ITAI 3375 — Data Curation and Optimization Portfolio
 
-**Student:** Williane Yarro  
+**Student:** Williane J Yarro  
 **Institution:** Houston City College  
 **Course:** ITAI 3375 — Data Curation and Optimization   
 **Semester:** Summer 2026
@@ -206,15 +206,14 @@ This portfolio reflects my progress in transforming raw information into organiz
 
 This repository was created for educational and professional portfolio purposes.
 
-All original course work is presented in accordance with academic-integrity expectations. Any third-party datasets, images, articles, software, or external resources remain subject to their original licenses and terms of use. Appropriate sources and acknowledgments are included within the relevant lab or assignment documentation.
+All original course work is presented in accordance with academic-integrity expectations. Any third-party datasets, images, articles, software, or external resources remain subject to their original licenses and terms of use. Appropriate sources and acknowledgments are included within the relevant labs or assignments documentation.
 
 ---
 
 ## Contact:
 ## Email Address: joelleyarro@yahoo.com
 ## LinkIN:
+## Github Link: https://github.com/joelleyarro03/Data-Curation-Optimization
 
 
-**Name:** [Your First and Last Name]  
-**GitHub:** [Your GitHub profile link]  
-**Email:** [Your professional or school email]
+
