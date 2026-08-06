@@ -1,25 +1,92 @@
-import torch
 import numpy as np
+import torch
 from torch.utils.data import Dataset
-import skimage
+import skimage.io
 
 
 class SmokeDataset(Dataset):
-    def __init__(self, data_dict, transform=None):
+    """
+    data_dict: {'data': [...paths...], 'truth': [...paths...]}
+    Options:
+      - joint_transform(image, mask) -> (image, mask)  # use for spatial aug like albumentations
+      - transform(image) -> tensor/ndarray for input image (e.g., intensity normalization / ToTensor)
+      - target_transform(mask) -> tensor/ndarray for mask (e.g., conversion to tensor)
+    If no transforms provided, images are converted to torch.float32 tensors with shape (C,H,W),
+    and masks are binary (0.0/1.0) float32 tensors with shape (1,H,W).
+    """
+    def __init__(self, data_dict, transform=None, target_transform=None, joint_transform=None):
         self.data_fns = data_dict
         self.transform = transform
+        self.target_transform = target_transform
+        self.joint_transform = joint_transform
+
+        assert 'data' in self.data_fns and 'truth' in self.data_fns
+        assert len(self.data_fns['data']) == len(self.data_fns['truth'])
 
     def __len__(self):
         return len(self.data_fns['data'])
 
+    @staticmethod
+    def _to_tensor(img):
+        # img: numpy array HxW or HxWxC
+        arr = np.asarray(img)
+        if arr.ndim == 2:              # H, W -> add channel
+            arr = arr[..., None]
+        # Ensure contiguous and float32
+        arr = np.ascontiguousarray(arr)
+        if arr.dtype != np.float32:
+            arr = arr.astype(np.float32)
+        # HWC -> CHW
+        arr = arr.transpose((2, 0, 1))
+        return torch.from_numpy(arr)
+
     def __getitem__(self, idx):
         data_fn = self.data_fns['data'][idx]
         truth_fn = self.data_fns['truth'][idx]
+
+        # load raw numpy arrays
         data_img = skimage.io.imread(data_fn, plugin='tifffile')
         truth_img = skimage.io.imread(truth_fn, plugin='tifffile')
-        data_tensor = self.transform(data_img)#.unsqueeze_(0)
-        truth_tensor = self.transform(truth_img)#.unsqueeze_(0)
-        truth_tensor = (truth_tensor > 0.0) * 1.0
-        truth_tensor = truth_tensor.type(torch.float32)
+
+        # Make binary mask from raw truth image
+        mask = (np.asarray(truth_img) > 0).astype(np.uint8)  # values 0 or 1
+
+        # If a joint_transform is provided (common for albumentations),
+        # apply it to both image and mask so spatial ops match.
+        if self.joint_transform is not None:
+            # joint_transform should accept and return (image, mask) as numpy arrays
+            data_img, mask = self.joint_transform(data_img, mask)
+
+        # Apply image transform (for intensity normalization etc.)
+        if self.transform is not None:
+            data_out = self.transform(data_img)
+            # If transform returned numpy array, convert to tensor
+            if isinstance(data_out, np.ndarray):
+                data_tensor = self._to_tensor(data_out)
+            elif torch.is_tensor(data_out):
+                data_tensor = data_out
+            else:
+                # assume transform returned something convertible to tensor
+                data_tensor = torch.as_tensor(data_out, dtype=torch.float32)
+        else:
+            data_tensor = self._to_tensor(data_img)
+
+        # Apply target transform if provided (e.g., converting mask to tensor or augment)
+        if self.target_transform is not None:
+            mask_out = self.target_transform(mask)
+            if isinstance(mask_out, np.ndarray):
+                truth_tensor = self._to_tensor(mask_out)
+            elif torch.is_tensor(mask_out):
+                truth_tensor = mask_out
+            else:
+                truth_tensor = torch.as_tensor(mask_out, dtype=torch.float32)
+        else:
+            truth_tensor = self._to_tensor(mask)
+
+        # Ensure mask is single-channel and binary float32
+        if truth_tensor.ndim == 3 and truth_tensor.shape[0] > 1:
+            # If somehow multi-channel, reduce to single channel (e.g., take first)
+            truth_tensor = truth_tensor[:1, ...]
+        truth_tensor = (truth_tensor > 0).to(dtype=torch.float32)
 
         return data_tensor, truth_tensor, truth_fn
